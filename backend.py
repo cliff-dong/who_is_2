@@ -56,6 +56,27 @@ def create_room():
     room_id = str(uuid.uuid4())[:8]
     return {"room_id": room_id}
 
+@app.get("/start_game/{room_id}")
+async def start_game(room_id: str):
+    """Starts the game by asking the first question."""
+    questions = [
+        "What is the meaning of life?",
+        "Describe yourself in one sentence.",
+        "If you could be an animal, what would you be?",
+        "What is your favorite hobby and why?"
+    ]
+    
+    if room_id not in manager.active_connections:
+        return {"error": "Room does not exist."}
+
+    question = random.choice(questions)
+    message = {"type": "new_question", "question": question}
+    
+    # Send the question to all players in the room
+    await manager.broadcast(room_id, message)
+    
+    return {"status": "Game started", "question": question}
+
 @app.get("/join_room/{room_id}")
 def join_room(room_id: str):
     """Checks if a room exists before joining."""
