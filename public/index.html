@@ -69,14 +69,6 @@
             }
         }
 
-        document.getElementById("submit-answer").addEventListener("click", async () => {
-            const answer = document.getElementById("answer").value;
-            if (!answer) return;
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ action: "submit_answer", answer: answer }));
-            }
-        });
-
         document.getElementById("create-room").addEventListener("click", async () => {
             const response = await fetch(`${backendURL}/create_room`);
             const data = await response.json();
@@ -88,6 +80,17 @@
             }
         });
 
+        document.getElementById("join-room").addEventListener("click", async () => {
+            roomId = document.getElementById("room-id").value;
+            const response = await fetch(`${backendURL}/join_room/${roomId}`);
+            const data = await response.json();
+            if (data.status === "ok") {
+                connectToWebSocket(roomId);
+                document.getElementById("game-area").style.display = "block";
+                document.getElementById("question-text").innerText = data.question;
+                updatePlayerTable(data.players);
+            }
+        });
     </script>
 </body>
 </html>
