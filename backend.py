@@ -6,13 +6,13 @@ from typing import List, Dict
 
 app = FastAPI()
 
-# ✅ Enable CORS (Fix frontend connection issues)
+# ✅ Enable CORS to allow frontend requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows requests from any frontend
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all HTTP methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 class ConnectionManager:
@@ -62,15 +62,19 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
         manager.disconnect(room_id, websocket)
 
 @app.get("/create_room")
-def create_room():
-    """Creates a unique game room and starts the game automatically."""
+async def create_room():
+    """Creates a game room and starts the game."""
     room_id = str(uuid.uuid4())[:8]
     games[room_id] = {"question": "", "players": {}, "answers": {}, "votes": {}}
+
+    # ✅ Automatically start the game with the first question
+    await start_game(room_id)
+    
     return {"room_id": room_id}
 
 @app.get("/start_game/{room_id}")
 async def start_game(room_id: str):
-    """Starts the game by asking the first question."""
+    """Starts the game by sending the first question."""
     questions = [
         "What is the meaning of life?",
         "Describe yourself in one sentence.",
@@ -85,7 +89,7 @@ async def start_game(room_id: str):
     games[room_id]["question"] = question
 
     message = {"type": "new_question", "question": question}
-    await manager.broadcast(room_id, message)
+    await manager.broadcast(room_id, message)  # ✅ Send question to all players
 
     return {"status": "Game started", "question": question}
 
@@ -93,7 +97,7 @@ async def start_game(room_id: str):
 def join_room(room_id: str):
     """Checks if a room exists before joining."""
     if room_id in games:
-        return {"status": "ok", "room_id": room_id}
+        return {"status": "ok", "room_id": room_id, "question": games[room_id]["question"]}
     return {"status": "error", "message": "Room does not exist."}
 
 @app.post("/submit_answer")
