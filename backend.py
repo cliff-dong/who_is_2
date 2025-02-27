@@ -6,7 +6,7 @@ from typing import List, Dict
 
 app = FastAPI()
 
-# ✅ Enable CORS to allow frontend requests
+# ✅ Enable CORS for frontend communication
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,9 +29,10 @@ class ConnectionManager:
 
     def disconnect(self, room_id: str, websocket: WebSocket):
         """Removes a disconnected player from the game room."""
-        self.active_connections[room_id].remove(websocket)
-        if not self.active_connections[room_id]:
-            del self.active_connections[room_id]
+        if room_id in self.active_connections and websocket in self.active_connections[room_id]:
+            self.active_connections[room_id].remove(websocket)
+            if not self.active_connections[room_id]:
+                del self.active_connections[room_id]
 
     async def broadcast(self, room_id: str, message: dict):
         """Sends a message to all players in a room."""
@@ -42,17 +43,26 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # ✅ Stores game state
-games = {}  # {room_id: {"question": str, "players": {}, "answers": {}, "votes": {}}}
+games = {}  # {room_id: {"question": str, "answers": {}, "votes": {}, "players": {}}}
 
 @app.websocket("/ws/{room_id}/{player_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str):
     """Handles WebSocket connections for real-time gameplay."""
     await manager.connect(room_id, websocket)
-    try:
-        # ✅ Send the question to the joining player
-        if room_id in games and games[room_id]["question"]:
-            await websocket.send_json({"type": "new_question", "question": games[room_id]["question"]})
+    
+    # ✅ Add player to the game
+    if room_id not in games:
+        games[room_id] = {"question": "", "answers": {}, "votes": {}, "players": {}}
+    games[room_id]["players"][player_id] = {"id": player_id, "status": "playing"}
+    
+    # ✅ Send the current game state (question, players)
+    await websocket.send_json({
+        "type": "new_question",
+        "question": games[room_id]["question"],
+        "players": list(games[room_id]["players"].keys())
+    })
 
+    try:
         while True:
             data = await websocket.receive_json()
             if "action" in data:
@@ -60,7 +70,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
                     games[room_id]["answers"][player_id] = data["answer"]
                     # ✅ Broadcast answer to all players
                     await manager.broadcast(room_id, {
-                        "type": "answer_submitted",
+                        "type": "answer_received",
                         "player": player_id,
                         "answer": data["answer"]
                     })
@@ -78,7 +88,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
 async def create_room():
     """Creates a game room and starts the game."""
     room_id = str(uuid.uuid4())[:8]
-    games[room_id] = {"question": "", "players": {}, "answers": {}, "votes": {}}
+    games[room_id] = {"question": "", "answers": {}, "votes": {}, "players": {}}
 
     # ✅ Automatically start the game with the first question
     await start_game(room_id)
@@ -101,62 +111,21 @@ async def start_game(room_id: str):
     question = random.choice(questions)
     games[room_id]["question"] = question
 
-    message = {"type": "new_question", "question": question}
-    
-    # ✅ Ensure the question is broadcasted immediately when the game starts
-    await manager.broadcast(room_id, message)
+    # ✅ Broadcast the question to all players
+    await manager.broadcast(room_id, {
+        "type": "new_question",
+        "question": question,
+        "players": list(games[room_id]["players"].keys())
+    })
 
     return {"status": "Game started", "question": question}
 
-@app.get("/join_room/{room_id}")
-async def join_room(room_id: str):
-    """Checks if a room exists before joining and returns the current question and answers."""
+@app.get("/players/{room_id}")
+async def get_players(room_id: str):
+    """Returns the list of players in a room."""
     if room_id in games:
-        return {
-            "status": "ok",
-            "room_id": room_id,
-            "question": games[room_id]["question"],
-            "answers": games[room_id]["answers"]
-        }
-    return {"status": "error", "message": "Room does not exist."}
-
-@app.post("/submit_answer")
-async def submit_answer(room_id: str, player_id: str, answer: str):
-    """Stores a player's answer and broadcasts it to all players."""
-    if room_id not in games:
-        return {"error": "Room does not exist."}
-    
-    games[room_id]["answers"][player_id] = answer
-    await manager.broadcast(room_id, {
-        "type": "answer_received",
-        "player": player_id,
-        "answer": answer
-    })
-
-    return {"status": "Answer submitted"}
-
-@app.post("/submit_vote")
-async def submit_vote(room_id: str, voter_id: str, voted_player_id: str):
-    """Records a player's vote and determines elimination."""
-    if room_id not in games:
-        return {"error": "Room does not exist."}
-    
-    games[room_id]["votes"][voter_id] = voted_player_id
-
-    # Tally votes
-    vote_counts = {}
-    for vote in games[room_id]["votes"].values():
-        vote_counts[vote] = vote_counts.get(vote, 0) + 1
-
-    most_voted_player = max(vote_counts, key=vote_counts.get)
-
-    await manager.broadcast(room_id, {
-        "type": "elimination",
-        "eliminated": most_voted_player,
-        "message": f"Player {most_voted_player} has been eliminated!"
-    })
-
-    return {"status": "Vote submitted", "eliminated": most_voted_player}
+        return {"players": list(games[room_id]["players"].keys())}
+    return {"error": "Room not found"}
 
 @app.get("/")
 def home():
