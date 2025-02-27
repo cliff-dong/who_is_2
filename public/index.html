@@ -22,89 +22,96 @@
     </div>
 
     <script>
-        const backendURL = "https://who-is-2.onrender.com";  // Your backend URL
-        let socket = null;
-        let roomId = null;
-        let playerId = "player-" + Math.floor(Math.random() * 1000); // Generate a random player ID
+    const backendURL = "https://who-is-2.onrender.com";
+    let socket = null;
+    let roomId = null;
+    let playerId = "player-" + Math.floor(Math.random() * 1000);
 
-        document.getElementById("create-room").addEventListener("click", async () => {
-            console.log("Creating game room...");
-            try {
-                const response = await fetch(`${backendURL}/create_room`);
-                const data = await response.json();
-                if (data.room_id) {
-                    roomId = data.room_id;
-                    document.getElementById("room-id").value = roomId;
-                    alert("Room Created! Share this ID: " + roomId);
-                    connectToWebSocket(roomId);
-                    document.getElementById("game-area").style.display = "block";
-                } else {
-                    alert("Error creating room. Try again.");
-                }
-            } catch (error) {
-                console.error("Error creating room:", error);
-                alert("Failed to create room. Backend might be down.");
-            }
-        });
-
-        document.getElementById("join-room").addEventListener("click", () => {
-            roomId = document.getElementById("room-id").value;
-            if (roomId) {
-                alert("Joining Room: " + roomId);
+    document.getElementById("create-room").addEventListener("click", async () => {
+        console.log("Creating game room...");
+        try {
+            const response = await fetch(`${backendURL}/create_room`);
+            const data = await response.json();
+            if (data.room_id) {
+                roomId = data.room_id;
+                document.getElementById("room-id").value = roomId;
+                alert("Room Created! Share this ID: " + roomId);
                 connectToWebSocket(roomId);
                 document.getElementById("game-area").style.display = "block";
+
+                // Start the game by asking the first question
+                await fetch(`${backendURL}/start_game/${roomId}`);
             } else {
-                alert("Enter a valid room ID.");
+                alert("Error creating room. Try again.");
             }
-        });
-
-        function connectToWebSocket(roomId) {
-            socket = new WebSocket(`wss://who-is-2.onrender.com/ws/${roomId}/${playerId}`);
-
-            socket.onopen = function() {
-                console.log("Connected to WebSocket!");
-            };
-
-            socket.onmessage = function(event) {
-                const message = JSON.parse(event.data);
-                console.log("Message received:", message);
-                document.getElementById("result").innerText = message.text || "Game updated!";
-            };
-
-            socket.onerror = function(error) {
-                console.error("WebSocket error:", error);
-                alert("WebSocket connection error!");
-            };
-
-            socket.onclose = function() {
-                console.log("Disconnected from WebSocket");
-            };
+        } catch (error) {
+            console.error("Error creating room:", error);
+            alert("Failed to create room. Backend might be down.");
         }
+    });
 
-        document.getElementById("submit-answer").addEventListener("click", async () => {
-            const answer = document.getElementById("answer").value;
-            if (!answer) {
-                alert("Enter an answer first!");
-                return;
+    document.getElementById("join-room").addEventListener("click", () => {
+        roomId = document.getElementById("room-id").value;
+        if (roomId) {
+            alert("Joining Room: " + roomId);
+            connectToWebSocket(roomId);
+            document.getElementById("game-area").style.display = "block";
+        } else {
+            alert("Enter a valid room ID.");
+        }
+    });
+
+    function connectToWebSocket(roomId) {
+        socket = new WebSocket(`wss://who-is-2.onrender.com/ws/${roomId}/${playerId}`);
+
+        socket.onopen = function() {
+            console.log("Connected to WebSocket!");
+        };
+
+        socket.onmessage = function(event) {
+            const message = JSON.parse(event.data);
+            console.log("Message received:", message);
+
+            // Display question when received
+            if (message.type === "new_question") {
+                document.getElementById("game-area").innerHTML = `<h2>${message.question}</h2>`;
             }
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ action: "submit_answer", answer: answer }));
-            } else {
-                alert("Not connected to game room!");
-            }
-        });
+        };
 
-        document.getElementById("vote").addEventListener("click", async () => {
-            const voteFor = prompt("Enter the player ID you think is AI:");
-            if (!voteFor) return;
+        socket.onerror = function(error) {
+            console.error("WebSocket error:", error);
+            alert("WebSocket connection error!");
+        };
 
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({ action: "submit_vote", vote: voteFor }));
-            } else {
-                alert("Not connected to game room!");
-            }
-        });
+        socket.onclose = function() {
+            console.log("Disconnected from WebSocket");
+        };
+    }
 
-    </script>
+    document.getElementById("submit-answer").addEventListener("click", async () => {
+        const answer = document.getElementById("answer").value;
+        if (!answer) {
+            alert("Enter an answer first!");
+            return;
+        }
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ action: "submit_answer", answer: answer }));
+        } else {
+            alert("Not connected to game room!");
+        }
+    });
+
+    document.getElementById("vote").addEventListener("click", async () => {
+        const voteFor = prompt("Enter the player ID you think is AI:");
+        if (!voteFor) return;
+
+        if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ action: "submit_vote", vote: voteFor }));
+        } else {
+            alert("Not connected to game room!");
+        }
+    });
+</script>
+
 </body>
 </html>
