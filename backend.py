@@ -54,10 +54,10 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
             if "action" in data:
                 if data["action"] == "submit_answer":
                     games[room_id]["answers"][player_id] = data["answer"]
-                    await manager.broadcast(room_id, {"type": "answer_submitted", "player": player_id})
+                    await manager.broadcast(room_id, {"type": "answer_submitted", "player": player_id, "answer": data["answer"]})
                 elif data["action"] == "submit_vote":
                     games[room_id]["votes"][player_id] = data["vote"]
-                    await manager.broadcast(room_id, {"type": "vote_submitted", "player": player_id})
+                    await manager.broadcast(room_id, {"type": "vote_submitted", "player": player_id, "vote": data["vote"]})
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)
 
@@ -74,7 +74,7 @@ async def create_room():
 
 @app.get("/start_game/{room_id}")
 async def start_game(room_id: str):
-    """Starts the game by sending the first question."""
+    """Starts the game by sending the first question to all players."""
     questions = [
         "What is the meaning of life?",
         "Describe yourself in one sentence.",
@@ -89,20 +89,22 @@ async def start_game(room_id: str):
     games[room_id]["question"] = question
 
     message = {"type": "new_question", "question": question}
-    await manager.broadcast(room_id, message)  # ✅ Send question to all players
+    
+    # ✅ Send the question immediately after creating the room
+    await manager.broadcast(room_id, message)
 
     return {"status": "Game started", "question": question}
 
 @app.get("/join_room/{room_id}")
-def join_room(room_id: str):
-    """Checks if a room exists before joining."""
+async def join_room(room_id: str):
+    """Checks if a room exists before joining and returns the current question."""
     if room_id in games:
         return {"status": "ok", "room_id": room_id, "question": games[room_id]["question"]}
     return {"status": "error", "message": "Room does not exist."}
 
 @app.post("/submit_answer")
 async def submit_answer(room_id: str, player_id: str, answer: str):
-    """Stores a player's answer and broadcasts it."""
+    """Stores a player's answer and broadcasts it to all players."""
     if room_id not in games:
         return {"error": "Room does not exist."}
     
