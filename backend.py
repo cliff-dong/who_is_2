@@ -43,18 +43,18 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 # ✅ Stores game state
-games = {}  # {room_id: {"question": str, "answers": {}, "votes": {}, "players": {}}}
+games = {}  # {room_id: {"question": str, "answers": {}, "players": {}}}
 
 @app.websocket("/ws/{room_id}/{player_id}")
 async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str):
     """Handles WebSocket connections for real-time gameplay."""
     await manager.connect(room_id, websocket)
-    
-    # ✅ Add player to the game
+
+    # ✅ Ensure the player list is initialized
     if room_id not in games:
-        games[room_id] = {"question": "", "answers": {}, "votes": {}, "players": {}}
-    games[room_id]["players"][player_id] = {"id": player_id, "status": "playing"}
-    
+        games[room_id] = {"question": "", "answers": {}, "players": {}}
+    games[room_id]["players"][player_id] = {"id": player_id}
+
     # ✅ Send the current game state (question, players)
     await websocket.send_json({
         "type": "new_question",
@@ -68,18 +68,11 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
             if "action" in data:
                 if data["action"] == "submit_answer":
                     games[room_id]["answers"][player_id] = data["answer"]
-                    # ✅ Broadcast answer to all players
+                    # ✅ Broadcast the answer to all players
                     await manager.broadcast(room_id, {
                         "type": "answer_received",
                         "player": player_id,
                         "answer": data["answer"]
-                    })
-                elif data["action"] == "submit_vote":
-                    games[room_id]["votes"][player_id] = data["vote"]
-                    await manager.broadcast(room_id, {
-                        "type": "vote_submitted",
-                        "player": player_id,
-                        "vote": data["vote"]
                     })
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)
@@ -88,7 +81,7 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
 async def create_room():
     """Creates a game room and starts the game."""
     room_id = str(uuid.uuid4())[:8]
-    games[room_id] = {"question": "", "answers": {}, "votes": {}, "players": {}}
+    games[room_id] = {"question": "", "answers": {}, "players": {}}
 
     # ✅ Automatically start the game with the first question
     await start_game(room_id)
