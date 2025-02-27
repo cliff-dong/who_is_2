@@ -47,3 +47,10 @@ def join_room(room_id: str):
     if room_id in manager.active_connections:
         return {"status": "ok", "room_id": room_id}
     return {"status": "error", "message": "Room does not exist."}
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.get("/")
+def home():
+    return {"message": "Who is AI? Game is running!"}
