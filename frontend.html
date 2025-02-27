@@ -10,20 +10,67 @@
     <button id="create-room">Create Game Room</button>
     <input id="room-id" type="text" placeholder="Enter Room ID" />
     <button id="join-room">Join Room</button>
+    
+    <div id="game-area" style="display: none;">
+        <h2>Game Room</h2>
+        <p>Answer the question and vote for who is AI!</p>
+        <input id="answer" type="text" placeholder="Your Answer" />
+        <button id="submit-answer">Submit Answer</button>
+        <button id="vote">Vote for AI</button>
+        <p id="result"></p>
+    </div>
+
     <script>
+        const backendURL = "https://who-is-2.onrender.com"; // Your backend URL
+
         document.getElementById("create-room").addEventListener("click", async () => {
-            const response = await fetch("/create_room");
+            const response = await fetch(`${backendURL}/create_room`);
             const data = await response.json();
             alert("Room Created! Share this ID: " + data.room_id);
+            document.getElementById("room-id").value = data.room_id;
+            document.getElementById("game-area").style.display = "block";
         });
 
         document.getElementById("join-room").addEventListener("click", () => {
             const roomId = document.getElementById("room-id").value;
             if (roomId) {
                 alert("Joining Room: " + roomId);
+                document.getElementById("game-area").style.display = "block";
             } else {
                 alert("Enter a valid room ID.");
             }
+        });
+
+        document.getElementById("submit-answer").addEventListener("click", async () => {
+            const roomId = document.getElementById("room-id").value;
+            const answer = document.getElementById("answer").value;
+            if (!answer) {
+                alert("Enter an answer first!");
+                return;
+            }
+
+            const response = await fetch(`${backendURL}/submit_answer`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ room_id: roomId, answer: answer })
+            });
+
+            const result = await response.json();
+            document.getElementById("result").innerText = "Answer submitted!";
+        });
+
+        document.getElementById("vote").addEventListener("click", async () => {
+            const roomId = document.getElementById("room-id").value;
+            const voteFor = prompt("Enter the player ID you think is AI:");
+
+            const response = await fetch(`${backendURL}/submit_vote`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ room_id: roomId, voted_player_id: voteFor })
+            });
+
+            const result = await response.json();
+            document.getElementById("result").innerText = `Voted for ${voteFor}!`;
         });
     </script>
 </body>
