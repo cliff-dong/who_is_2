@@ -49,6 +49,10 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
     """Handles WebSocket connections for real-time gameplay."""
     await manager.connect(room_id, websocket)
     try:
+        # ✅ Send the question to the joining player
+        if room_id in games and games[room_id]["question"]:
+            await websocket.send_json({"type": "new_question", "question": games[room_id]["question"]})
+
         while True:
             data = await websocket.receive_json()
             if "action" in data:
@@ -90,7 +94,7 @@ async def start_game(room_id: str):
 
     message = {"type": "new_question", "question": question}
     
-    # ✅ Send the question immediately after creating the room
+    # ✅ Ensure the question is broadcasted immediately when the game starts
     await manager.broadcast(room_id, message)
 
     return {"status": "Game started", "question": question}
