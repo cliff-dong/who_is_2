@@ -113,12 +113,17 @@ async def start_game(room_id: str):
 
     return {"status": "Game started", "question": question}
 
-@app.get("/players/{room_id}")
-async def get_players(room_id: str):
-    """Returns the list of players in a room."""
+@app.get("/join_room/{room_id}")
+async def join_room(room_id: str):
+    """Allows a player to join an existing room and receive the game state."""
     if room_id in games:
-        return {"players": list(games[room_id]["players"].keys())}
-    return {"error": "Room not found"}
+        return {
+            "status": "ok",
+            "room_id": room_id,
+            "question": games[room_id]["question"],
+            "players": list(games[room_id]["players"].keys())
+        }
+    return {"status": "error", "message": "Room does not exist."}
 
 @app.get("/")
 def home():
