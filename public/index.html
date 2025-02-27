@@ -28,13 +28,23 @@
         let playerId = "player-" + Math.floor(Math.random() * 1000); // Generate a random player ID
 
         document.getElementById("create-room").addEventListener("click", async () => {
-            const response = await fetch(`${backendURL}/create_room`);
-            const data = await response.json();
-            roomId = data.room_id;
-            document.getElementById("room-id").value = roomId;
-            alert("Room Created! Share this ID: " + roomId);
-            connectToWebSocket(roomId);
-            document.getElementById("game-area").style.display = "block";
+            console.log("Creating game room...");
+            try {
+                const response = await fetch(`${backendURL}/create_room`);
+                const data = await response.json();
+                if (data.room_id) {
+                    roomId = data.room_id;
+                    document.getElementById("room-id").value = roomId;
+                    alert("Room Created! Share this ID: " + roomId);
+                    connectToWebSocket(roomId);
+                    document.getElementById("game-area").style.display = "block";
+                } else {
+                    alert("Error creating room. Try again.");
+                }
+            } catch (error) {
+                console.error("Error creating room:", error);
+                alert("Failed to create room. Backend might be down.");
+            }
         });
 
         document.getElementById("join-room").addEventListener("click", () => {
@@ -61,6 +71,11 @@
                 document.getElementById("result").innerText = message.text || "Game updated!";
             };
 
+            socket.onerror = function(error) {
+                console.error("WebSocket error:", error);
+                alert("WebSocket connection error!");
+            };
+
             socket.onclose = function() {
                 console.log("Disconnected from WebSocket");
             };
@@ -74,6 +89,8 @@
             }
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ action: "submit_answer", answer: answer }));
+            } else {
+                alert("Not connected to game room!");
             }
         });
 
@@ -83,6 +100,8 @@
 
             if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.send(JSON.stringify({ action: "submit_vote", vote: voteFor }));
+            } else {
+                alert("Not connected to game room!");
             }
         });
 
