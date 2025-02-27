@@ -7,6 +7,7 @@
 </head>
 <body>
     <h1>Welcome to Who is AI?</h1>
+    
     <button id="create-room">Create Game Room</button>
     <input id="room-id" type="text" placeholder="Enter Room ID" />
     <button id="join-room">Join Room</button>
@@ -21,57 +22,70 @@
     </div>
 
     <script>
-        const backendURL = "https://who-is-2.onrender.com"; // Your backend URL
+        const backendURL = "https://who-is-2.onrender.com";  // Your backend URL
+        let socket = null;
+        let roomId = null;
+        let playerId = "player-" + Math.floor(Math.random() * 1000); // Generate a random player ID
 
         document.getElementById("create-room").addEventListener("click", async () => {
             const response = await fetch(`${backendURL}/create_room`);
             const data = await response.json();
-            alert("Room Created! Share this ID: " + data.room_id);
-            document.getElementById("room-id").value = data.room_id;
+            roomId = data.room_id;
+            document.getElementById("room-id").value = roomId;
+            alert("Room Created! Share this ID: " + roomId);
+            connectToWebSocket(roomId);
             document.getElementById("game-area").style.display = "block";
         });
 
         document.getElementById("join-room").addEventListener("click", () => {
-            const roomId = document.getElementById("room-id").value;
+            roomId = document.getElementById("room-id").value;
             if (roomId) {
                 alert("Joining Room: " + roomId);
+                connectToWebSocket(roomId);
                 document.getElementById("game-area").style.display = "block";
             } else {
                 alert("Enter a valid room ID.");
             }
         });
 
+        function connectToWebSocket(roomId) {
+            socket = new WebSocket(`wss://who-is-2.onrender.com/ws/${roomId}/${playerId}`);
+
+            socket.onopen = function() {
+                console.log("Connected to WebSocket!");
+            };
+
+            socket.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                console.log("Message received:", message);
+                document.getElementById("result").innerText = message.text || "Game updated!";
+            };
+
+            socket.onclose = function() {
+                console.log("Disconnected from WebSocket");
+            };
+        }
+
         document.getElementById("submit-answer").addEventListener("click", async () => {
-            const roomId = document.getElementById("room-id").value;
             const answer = document.getElementById("answer").value;
             if (!answer) {
                 alert("Enter an answer first!");
                 return;
             }
-
-            const response = await fetch(`${backendURL}/submit_answer`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ room_id: roomId, answer: answer })
-            });
-
-            const result = await response.json();
-            document.getElementById("result").innerText = "Answer submitted!";
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ action: "submit_answer", answer: answer }));
+            }
         });
 
         document.getElementById("vote").addEventListener("click", async () => {
-            const roomId = document.getElementById("room-id").value;
             const voteFor = prompt("Enter the player ID you think is AI:");
+            if (!voteFor) return;
 
-            const response = await fetch(`${backendURL}/submit_vote`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ room_id: roomId, voted_player_id: voteFor })
-            });
-
-            const result = await response.json();
-            document.getElementById("result").innerText = `Voted for ${voteFor}!`;
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ action: "submit_vote", vote: voteFor }));
+            }
         });
+
     </script>
 </body>
 </html>
