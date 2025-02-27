@@ -58,10 +58,19 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str, player_id: str)
             if "action" in data:
                 if data["action"] == "submit_answer":
                     games[room_id]["answers"][player_id] = data["answer"]
-                    await manager.broadcast(room_id, {"type": "answer_submitted", "player": player_id, "answer": data["answer"]})
+                    # ✅ Broadcast answer to all players
+                    await manager.broadcast(room_id, {
+                        "type": "answer_submitted",
+                        "player": player_id,
+                        "answer": data["answer"]
+                    })
                 elif data["action"] == "submit_vote":
                     games[room_id]["votes"][player_id] = data["vote"]
-                    await manager.broadcast(room_id, {"type": "vote_submitted", "player": player_id, "vote": data["vote"]})
+                    await manager.broadcast(room_id, {
+                        "type": "vote_submitted",
+                        "player": player_id,
+                        "vote": data["vote"]
+                    })
     except WebSocketDisconnect:
         manager.disconnect(room_id, websocket)
 
@@ -101,9 +110,14 @@ async def start_game(room_id: str):
 
 @app.get("/join_room/{room_id}")
 async def join_room(room_id: str):
-    """Checks if a room exists before joining and returns the current question."""
+    """Checks if a room exists before joining and returns the current question and answers."""
     if room_id in games:
-        return {"status": "ok", "room_id": room_id, "question": games[room_id]["question"]}
+        return {
+            "status": "ok",
+            "room_id": room_id,
+            "question": games[room_id]["question"],
+            "answers": games[room_id]["answers"]
+        }
     return {"status": "error", "message": "Room does not exist."}
 
 @app.post("/submit_answer")
@@ -113,7 +127,11 @@ async def submit_answer(room_id: str, player_id: str, answer: str):
         return {"error": "Room does not exist."}
     
     games[room_id]["answers"][player_id] = answer
-    await manager.broadcast(room_id, {"type": "answer_received", "player": player_id, "answer": answer})
+    await manager.broadcast(room_id, {
+        "type": "answer_received",
+        "player": player_id,
+        "answer": answer
+    })
 
     return {"status": "Answer submitted"}
 
