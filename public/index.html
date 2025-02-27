@@ -14,6 +14,9 @@
     
     <div id="game-area" style="display: none;">
         <h2 id="question-text">Waiting for question...</h2>
+        <input id="answer" type="text" placeholder="Your Answer" />
+        <button id="submit-answer">Submit Answer</button>
+
         <h3>Players</h3>
         <table id="player-table" border="1">
             <tr>
@@ -66,20 +69,20 @@
             }
         }
 
+        document.getElementById("submit-answer").addEventListener("click", async () => {
+            const answer = document.getElementById("answer").value;
+            if (!answer) return;
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ action: "submit_answer", answer: answer }));
+            }
+        });
+
         document.getElementById("create-room").addEventListener("click", async () => {
             const response = await fetch(`${backendURL}/create_room`);
             const data = await response.json();
             if (data.room_id) {
                 roomId = data.room_id;
                 document.getElementById("room-id").value = roomId;
-                connectToWebSocket(roomId);
-                document.getElementById("game-area").style.display = "block";
-            }
-        });
-
-        document.getElementById("join-room").addEventListener("click", async () => {
-            roomId = document.getElementById("room-id").value;
-            if (roomId) {
                 connectToWebSocket(roomId);
                 document.getElementById("game-area").style.display = "block";
             }
