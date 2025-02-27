@@ -21,7 +21,7 @@
                 <th>Vote</th>
             </tr>
         </table>
-        <p id="result"></p>
+        <h3>Answers</h3>
         <div id="answers-list"></div>
     </div>
 
@@ -65,6 +65,26 @@
                 socket.send(JSON.stringify({ action: "submit_vote", vote: playerId }));
             }
         }
+
+        document.getElementById("create-room").addEventListener("click", async () => {
+            const response = await fetch(`${backendURL}/create_room`);
+            const data = await response.json();
+            if (data.room_id) {
+                roomId = data.room_id;
+                document.getElementById("room-id").value = roomId;
+                connectToWebSocket(roomId);
+                document.getElementById("game-area").style.display = "block";
+            }
+        });
+
+        document.getElementById("join-room").addEventListener("click", async () => {
+            roomId = document.getElementById("room-id").value;
+            if (roomId) {
+                connectToWebSocket(roomId);
+                document.getElementById("game-area").style.display = "block";
+            }
+        });
+
     </script>
 </body>
 </html>
